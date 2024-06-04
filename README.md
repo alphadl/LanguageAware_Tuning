@@ -15,7 +15,7 @@ We introduce a two-stage fine-tuning algorithm for LLMs that leverages instructi
 </div>
 
 ## Requirements
-Our code is based on HuggingFace's Transformer tookit.
+Our code is based on HuggingFace's Transformer toolkit.
 The version of Python is 3.10. 
 
 ```setup
@@ -26,8 +26,8 @@ bash setup.sh
 The datasets used in our paper are publicly available. 
 
 * IWSLT: We take IWSLT17 data from [MMCR4NLP](https://arxiv.org/abs/1710.01025) for evaluation. 
-* WMT:  We use the development sets from WMT2017 to WMT2020 for instruction tuning and the test sets of WMT22 for evluation. The data can be downloaded from [WMT website](https://www.statmt.org/). 
-* Alpaca: We use the official released [Alpaca](https://github.com/tatsu-lab/stanford_alpaca) dataset. 
+* WMT:  We use the development sets from WMT2017 to WMT2020 for instruction tuning and the test sets of WMT22 for evaluation. The data can be downloaded from [WMT website](https://www.statmt.org/). 
+* Alpaca: We use the officially released [Alpaca](https://github.com/tatsu-lab/stanford_alpaca) dataset. 
 
 All translation training data from *{src_lang}* to *{tgt_lang}* are in the same template:
 ```
@@ -53,8 +53,8 @@ bash fine_tuning.sh ${task_name}
 Note
 * The path of pretrained LLMs, dataset, and checkpoint save path should be defined in the fine_tuning.sh file. 
 
-* The default setting need 8*GPUs. It can alternately use few number GPUs with larger gradient_accumulation_steps, for example GPUs number 4 and gradient_accumulation_steps 32.
-
+* The default setting needs 8*GPUs. It can alternately use fewer GPUs with larger gradient_accumulation_steps, for example, GPUs number 4 and gradient_accumulation_steps 32.
+  
 ## Evaluation
 
 To evaluate models and reproduce the results in our paper, run the following commands.
@@ -64,7 +64,7 @@ To evaluate models and reproduce the results in our paper, run the following com
 cd evaluate
 bash inference.sh ${task_name}
 ```
-2. PTL: inference with the prompt in target language. 
+2. PTL: inference with the prompt in the target language. 
 ```
 dataset=iwslt4
 bash inference.sh ${task_name} ${dataset} False PTL
@@ -75,7 +75,7 @@ n_shot=1
 # n_shot=5
 bash inference.sh ${task_name} False False few_shot 1
 ```
-4. #post_ins#: inference with post instruction template. This use the model trained with post instruction template. 
+4. #post_ins#: inference with post instruction template. This uses the model trained with a post instruction template. 
 ```
 task_name=llama3-8b.mt12000.post_ins
 bash inference.sh ${task_name} iwslt4 post_ins
@@ -90,7 +90,6 @@ Note
 * The paths for checkpoints and test data should be defined.
 
 * we use the follow prompt for llm-as-evaluator to compute the *win* rate % on [AlpacaEval](https://github.com/tatsu-lab/alpaca_eval) dataset,
-To compute the *tie* ratio, we switch the position of *model_1* and *model_2* and conduct evaluation twice. The situation of one win and one loss is *tie*. 
 To compute the *tie* ratio, we switch the positon of *model_1* and *model_2* and conduct evaluation twice. A scenario where each model wins one and loses one is considered a *tie*.
 
 ```
