@@ -1,9 +1,8 @@
-# LanguageAware_Tuning
-Building Accurate Translation-Tailored LLMs with Language-Aware Instruction Tuning. ([preprint paper](https://arxiv.org/pdf/2403.14399.pdf) | [Media Coverage](https://slator.com/how-to-overcome-the-off-target-translation-issue-in-large-language-models/))
+# Building Accurate Translation-Tailored LLMs with Language Aware Instruction Tuning
 
-## Abstract
+This repository is the official implementation of Building Accurate Translation-Tailored LLMs with Language Aware Instruction Tuning. ([preprint paper](https://arxiv.org/pdf/2403.14399.pdf) | [Media Coverage](https://slator.com/how-to-overcome-the-off-target-translation-issue-in-large-language-models/))
 
-Translation-tailored Large language models (LLMs) exhibit remarkable translation capabilities, even competing with supervised-trained commercial translation systems. However, off-target translation remains an unsolved problem, especially for low-resource languages, hindering us from developing accurate LLMs-based translation models. To mitigate the off-target translation problem and enhance the performance of LLMs on translation, recent works have either designed advanced prompting strategies to highlight the functionality of translation instructions or exploited the in-context learning ability of LLMs by feeding few-shot demonstrations. However, these methods essentially do not improve LLM's ability to follow translation instructions, especially the language direction information. In this work, we design a two-stage fine-tuning algorithm to improve the instruction-following ability (especially the translation direction) of LLMs. Specifically, we first tune LLMs with the maximum likelihood estimation loss on the translation dataset to elicit the basic translation capabilities. In the second stage, we construct instruction-conflicting samples by randomly replacing the translation directions with a wrong one within the instruction, and then introduce an extra unlikelihood loss to learn those samples. Experiments on IWSLT and WMT benchmarks upon the LLaMA model spanning 16 zero-shot directions show that, compared to the competitive baseline -- translation-finetuned LLama, our method could effectively reduce the off-target translation ratio (averagely -53.3\%), thus improving translation quality with average +5.7 SacreBLEU and +16.4 BLEURT. Analysis shows that our method could preserve the model's general task performance on AlpacaEval.
+> Large language models (LLMs) exhibit remarkable capabilities in various natural language processing tasks, such as machine translation. However, the large number of parameters of LLMs incurs significant costs during inference. Previous works have attempted to train translation-tailored LLMs with moderately size models by fine-tuning them on translation data. Nevertheless, when applying zero-shot translation directions not included in the fine-tuning data, the issue of ignoring instructions and thus translating into the wrong language, i.e., the off-target translation issue, remains unsolved. In this work, we design a two-stage fine-tuning algorithm to improve the instruction-following ability of translation-tailored LLMs, particularly for maintaining accurate translation directions. We first fine-tune LLMs on the translation dataset to elicit basic translation capabilities. In the second stage, we construct instruction-conflicting samples by randomly replacing the instructions with incorrect ones. Then, we introduce an extra unlikelihood loss to reduce the probability assigned to those samples. Experiments on IWSLT and WMT benchmarks using the LLaMA2 and LLaMA3 models, spanning 16 zero-shot directions, demonstrate that, compared to the competitive baseline -- translation-finetuned LLaMA, our method could effectively reduce the off-target translation ratio (up to -62.4%), thus improving translation quality (up to +9.7 BLEU).  Analysis shows that our method could preserve the model's performance of other tasks, such as supervised translation and general tasks.
 
 ## Method
 
@@ -15,16 +14,99 @@ We introduce a two-stage fine-tuning algorithm for LLMs that leverages instructi
     <img width="80%" alt="image" src="./assets/method.png">
 </div>
 
-## Main Results
+## Requirements
+Our code is based on HuggingFace's Transformer tookit.
+The version of Python is 3.10. 
+
+```setup
+bash setup.sh 
+```
+
+## Datasets
+The datasets used in our paper are publicly available. 
+
+* IWSLT: We take IWSLT17 data from [MMCR4NLP](https://arxiv.org/abs/1710.01025) for evaluation. 
+* WMT:  We use the development sets from WMT2017 to WMT2020 for instruction tuning and the test sets of WMT22 for evluation. The data can be downloaded from [WMT website](https://www.statmt.org/). 
+* Alpaca: We use the official released [Alpaca](https://github.com/tatsu-lab/stanford_alpaca) dataset. 
+
+All translation training data from *{src_lang}* to *{tgt_lang}* are in the same template:
+```
+Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request.
+
+### Instruction:
+Translate the following sentences from {src_lang} to {tgt_lang}.
+
+### Input:
+{input}
+
+### Response:
+```
+
+## Training
+
+To train the model(s) in our paper, run this command:
+
+```train
+task_name=llama3-8b.mt12000
+bash fine_tuning.sh ${task_name}
+```
+Note
+* The path of pretrained LLMs, dataset, and checkpoint save path should be defined in the fine_tuning.sh file. 
+
+* The default setting need 8*GPUs. It can alternately use few number GPUs with larger gradient_accumulation_steps, for example GPUs number 4 and gradient_accumulation_steps 32.
+
+## Evaluation
+
+To evaluate models and reproduce the results in our paper, run the following commands.
+
+1. MT: inference with the default template. 
+```
+cd evaluate
+bash inference.sh ${task_name}
+```
+2. PTL: inference with the prompt in target language. 
+```
+dataset=iwslt4
+bash inference.sh ${task_name} ${dataset} False PTL
+```
+3. n-shot: inference with in-context learning. We consider the 1-shot and 5-shot settings. 
+```
+n_shot=1
+# n_shot=5
+bash inference.sh ${task_name} False False few_shot 1
+```
+4. #post_ins#: inference with post instruction template. This use the model trained with post instruction template. 
+```
+task_name=llama3-8b.mt12000.post_ins
+bash inference.sh ${task_name} iwslt4 post_ins
+```
+
+We provide the record_result.py to collect the BLEU and OTR scores. 
+```
+python record_result.py 
+```
+
+Note
+* The paths for checkpoints and test data should be defined.
+
+* we use the follow prompt for llm-as-evaluator to compute the *win* rate % on [AlpacaEval](https://github.com/tatsu-lab/alpaca_eval) dataset,
+To compute the *tie* ratio, we switch the position of *model_1* and *model_2* and conduct evaluation twice. The situation of one win and one loss is *tie*. 
+To compute the *tie* ratio, we switch the positon of *model_1* and *model_2* and conduct evaluation twice. A scenario where each model wins one and loses one is considered a *tie*.
+
+```
+Prompt = 'I want you to create a leaderboard of different of large-language models. To do so, I will give you the instructions (prompts) given to the models, and the responses of two models. Please rank the models based on which responses would be preferred by humans. All inputs and outputs should be python dictionaries.\n\nHere is the prompt:\n{{\n    "instruction": """{instruction}""",\n}}\n\nHere are the outputs of the models:\n[\n    {{\n        "model": "model_1",\n        "answer": """{output_1}"""\n    }},\n    {{\n        "model": "model_2",\n        "answer": """{output_2}"""\n    }}\n]\n\nNow please rank the models by the quality of their answers, so that the model with rank 1 has the best output. Then return a list of the model names and ranks, i.e., produce the following output:\n[\n    {{"model": <model-name>, "rank": <model-rank>}},\n    {{"model": <model-name>, "rank": <model-rank>}}\n]\n\nYour response must be a valid Python dictionary and should contain nothing else because we will directly execute it in Python. Please provide the ranking that the majority of humans would give.\n'
+```
+
+## Results
 
 The zero-shot translation performance comparison of our model and other baselines on WMT and IWSLT datasets:
 
-    WMT dataset
+  WMT dataset
 <div align="center">
     <img width="80%" alt="image" src="./assets/results_wmt.png">
 </div>
 
-    IWSLT dataset
+  IWSLT dataset
 <div align="center">
     <img width="80%" alt="image" src="./assets/results_iwslt.png">
 </div>
@@ -33,13 +115,12 @@ The zero-shot translation performance comparison of our model and other baseline
 - Slator: [How to Overcome the Off-Target Translation Issue in Large Language Models](https://slator.com/how-to-overcome-the-off-target-translation-issue-in-large-language-models/)
 
 ## Citation
-If you find this work helpful, please consider citing as follows:  
-```ruby
+If our method and code help you, please considering cite our work:
+```
 @inproceedings{Zan2024LAT,
   title={Building Accurate Translation-Tailored LLMs with Language Aware Instruction Tuning},
   author={Zan, Changtong and Ding, Liang and Shen, Li and Zhan, Yibing and Liu, Weifeng and Tao, Dacheng},
   booktitle={arXiv preprint},
-  url={https://arxiv.org/abs/2403.14399},
   year={2024}
 }
 ```
